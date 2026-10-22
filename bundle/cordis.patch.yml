@@ -1,0 +1,10 @@
+- insert:
+    - id: turn-chime
+      name: "@local/dsh-turn-chime"
+      config:
+        # Skip a second chime triggered within 2.5 s (a turn close emits both
+        # agent/turn-stopping and agent/status idle).
+        cooldownMs: 2500
+        # Diagnostic trail so each chime can be verified after the fact.
+        # Empty string disables the log.
+        logPath: 'C:/Users/a1941/Desktop/DeepSeek/dsh-sound-notify/chime.log'

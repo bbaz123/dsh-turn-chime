@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Turn-end chime",
+    "description": "Plays a notification sound on the Host whenever an agent turn finishes, audible even with the browser closed."
+  }
+}

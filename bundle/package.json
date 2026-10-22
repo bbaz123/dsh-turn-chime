@@ -1,0 +1,27 @@
+{
+  "name": "@local/dsh-turn-chime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "回合结束提示音：DSH 每结束一轮任务时，在宿主端播放提示音。",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "icon": "./icon.svg",
+  "files": [
+    "index.js",
+    "play.ps1",
+    "notify.wav",
+    "icon.svg",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

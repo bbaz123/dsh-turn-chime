@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh">
+<head><meta charset="utf-8"><title>diag</title></head>
+<body>
+<pre id="log">diag start</pre>
+<script>
+const lines = [];
+const log = (m) => { lines.push(m); document.getElementById('log').textContent = lines.join('\n'); };
+const hex = (buf, n = 8) => Array.from(new Uint8Array(buf).slice(0, n)).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+
+function xhrBytes(url) {
+  return new Promise((resolve) => {
+    const x = new XMLHttpRequest();
+    x.open('GET', url, true);
+    x.responseType = 'arraybuffer';
+    x.onload = () => resolve({ status: x.status, buf: x.response });
+    x.onerror = () => resolve({ status: -1, buf: null });
+    x.send();
+  });
+}
+
+async function fetchBytes(url) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    const buf = await r.arrayBuffer();
+    return { status: r.status, buf };
+  } catch (e) {
+    return { status: -2, buf: null, err: e.name + ':' + e.message };
+  }
+}
+
+function encodeWav(ab) {
+  const numCh = ab.numberOfChannels, sr = ab.sampleRate, len = ab.length;
+  const blockAlign = numCh * 2, dataBytes = len * blockAlign;
+  const buffer = new ArrayBuffer(44 + dataBytes), view = new DataView(buffer);
+  const wstr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  wstr(0, 'RIFF'); view.setUint32(4, 36 + dataBytes, true); wstr(8, 'WAVE');
+  wstr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, numCh, true); view.setUint32(24, sr, true);
+  view.setUint32(28, sr * blockAlign, true); view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true); wstr(36, 'data'); view.setUint32(40, dataBytes, true);
+  const chans = []; for (let c = 0; c < numCh; c++) chans.push(ab.getChannelData(c));
+  let off = 44;
+  for (let i = 0; i < len; i++) {
+    for (let c = 0; c < numCh; c++) {
+      let s = Math.max(-1, Math.min(1, chans[c][i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true); off += 2;
+    }
+  }
+  return buffer;
+}
+
+(async () => {
+  let audioBuf = null;
+  try {
+    log('canPlayType mp3="' + document.createElement('audio').canPlayType('audio/mpeg') + '" wav="' + document.createElement('audio').canPlayType('audio/wav') + '"');
+    const ac = new OfflineAudioContext(1, 1, 44100);
+    const fx = await fetchBytes('/sound.mp3');
+    log('FETCH status=' + fx.status + ' bytes=' + (fx.buf ? fx.buf.byteLength : -1) + (fx.err ? ' err=' + fx.err : '') + ' head=' + (fx.buf ? hex(fx.buf) : '-'));
+    const xx = await xhrBytes('/sound.mp3');
+    log('XHR status=' + xx.status + ' bytes=' + (xx.buf ? xx.buf.byteLength : -1) + ' head=' + (xx.buf ? hex(xx.buf) : '-'));
+    for (const [label, res] of [['fetch', fx], ['xhr', xx]]) {
+      if (audioBuf || !res.buf || res.buf.byteLength === 0) continue;
+      try {
+        audioBuf = await ac.decodeAudioData(res.buf);
+        log(label + ' DECODE_OK ch=' + audioBuf.numberOfChannels + ' sr=' + audioBuf.sampleRate + ' dur=' + audioBuf.duration.toFixed(3));
+      } catch (e) { log(label + ' DECODE_FAIL ' + e.name + ' :: ' + e.message); }
+    }
+    if (audioBuf) {
+      const wav = encodeWav(audioBuf);
+      log('WAV bytes=' + wav.byteLength);
+      const up = await fetch('/wav', { method: 'POST', body: wav });
+      log('POST /wav -> ' + up.status);
+    }
+  } catch (e) {
+    log('OUTER_FAIL ' + (e && e.stack || e));
+  }
+  try { await fetch('/diag', { method: 'POST', body: lines.join('\n') }); } catch (_) {}
+})();
+</script>
+</body>
+</html>
